@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>ホロカ 2P対面カウンター (公式マット準拠)</title>
+  <style>
+    * { box-sizing: border-box; touch-action: manipulation; }
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      margin: 0;
+      padding: 0;
+      background-color: #0f172a;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      color: white;
+      font-family: sans-serif;
+      text-align: center;
+      overflow: hidden;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+    }
+
+    /* 対面反転用クラス */
+    .opponent-side {
+      transform: rotate(180deg);
+    }
+
+    /* 1プレイヤー分のフィールド */
+    .player-board {
+      display: flex;
+      flex-direction: column;
+      padding: 2px;
+      height: calc(50vh - 18px);
+      justify-content: space-between;
+    }
+
+    /* マット全体グリッドレイアウト */
+    .playmat-grid {
+      display: grid;
+      grid-template-columns: 0.9fr 3.2fr 0.9fr; /* 左(ライフ/エール) 中(ステージ) 右(山札系) */
+      gap: 3px;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* 左右のカラム */
+    .side-col {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 2px;
+    }
+
+    /* 中央ステージカラム */
+    .stage-col {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 2px;
+    }
+
+    .stage-top {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr; /* コラボ, メイン, 推し */
+      gap: 2px;
+      height: 48%;
+    }
+
+    .stage-bottom {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr); /* バック1〜5 */
+      gap: 2px;
+      height: 50%;
+    }
+
+    /* 中央共有コントロールバー */
+    .center-bar {
+      height: 36px;
+      background: rgba(15, 23, 42, 0.95);
+      border-top: 1px solid rgba(255, 255, 255, 0.2);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 4px;
+      z-index: 100;
+      backdrop-filter: blur(4px);
+      flex-shrink: 0;
+    }
+
+    .header-btn, .bg-input-label {
+      background: rgba(51, 65, 85, 0.8);
+      color: #ffffff;
+      font-size: 8px;
+      padding: 2px 4px;
+      border-radius: 4px;
+      cursor: pointer;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      display: flex;
+      align-items: center;
+      height: 22px;
+    }
+    .bg-input-label input { display: none; }
+
+    /* 基本枠（カード/カウンター領域） */
+    .zone { 
+      background: rgba(30, 34, 48, 0.55); 
+      border: 1px solid rgba(255, 255, 255, 0.25); 
+      border-radius: 4px; 
+      padding: 2px; 
+      display: flex; 
+      flex-direction: column; 
+      justify-content: space-between; 
+      align-items: center;
+      backdrop-filter: blur(2px);
+      height: 100%;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .zone.selected { 
+      border-color: #ff4081; 
+      background: rgba(75, 30, 60, 0.75); 
+      box-shadow: 0 0 8px #ff4081; 
+    }
+
+    .zone.empty { 
+      background: rgba(15, 18, 25, 0.25); 
+      border-color: rgba(255, 255, 255, 0.15); 
+      opacity: 0.6; 
+    }
+
+    .zone-title { 
+      font-size: 7px; 
+      font-weight: 900; 
+      color: #cbd5e1; 
+      width: 100%; 
+      line-height: 1;
+      white-space: nowrap;
+      text-align: center;
+    }
+
+    /* カウンター数値表示 */
+    .count-val {
+      font-size: 14px;
+      font-weight: 900;
+      color: #38bdf8;
+      text-shadow: 0 0 4px rgba(56, 189, 248, 0.5);
+      font-variant-numeric: tabular-nums;
+      margin: auto 0;
+    }
+
+    .count-val.dmg {
+      color: #ff5252;
+      text-shadow: 0 0 4px rgba(255, 82, 82, 0.8);
+    }
+
+    .count-val.life-val {
+      color: #f43f5e;
+      text-shadow: 0 0 4px rgba(244, 63, 94, 0.8);
+    }
+
+    /* 上下ボタン操作 */
+    .mini-btn-group {
+      display: flex;
+      width: 100%;
+      gap: 1px;
+    }
+
+    .mini-btn {
+      flex: 1;
+      background: rgba(51, 65, 85, 0.9);
+      color: white;
+      border: none;
+      height: 14px;
+      font-size: 8px;
+      font-weight: 900;
+      border-radius: 2px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+
+    /* ダメージ調整ボタン群 */
+    .dice-btn-group {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      gap: 1px;
+    }
+
+    .tri-btn {
+      border: none;
+      cursor: pointer;
+      color: white;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      height: 14px;
+      font-size: 6.5px;
+      border-radius: 2px;
+      padding: 0;
+    }
+    .tri-btn.b100 { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
+    .tri-btn.b50 { background: linear-gradient(135deg, #eab308, #ca8a04); }
+    .tri-btn.b10 { background: linear-gradient(135deg, #22c55e, #15803d); }
+
+    .action-row { display: flex; gap: 1px; width: 100%; }
+    .action-btn { 
+      font-size: 6.5px; 
+      padding: 1px 0; 
+      flex: 1;
+      border: none; 
+      border-radius: 2px; 
+      font-weight: 900; 
+      cursor: pointer; 
+      line-height: 1;
+    }
+    .action-btn.sub { background: rgba(71, 85, 105, 0.9); color: #f1f5f9; }
+    .action-btn.clear { background: rgba(239, 68, 68, 0.9); color: white; }
+    .action-btn.empty-btn { background: rgba(51, 65, 85, 0.9); color: #cbd5e1; }
+    
+    .move-btn { 
+      background: rgba(139, 92, 246, 0.9); 
+      color: white; 
+      width: 100%; 
+      font-size: 6.5px; 
+      padding: 1px 0; 
+      border: none; 
+      border-radius: 2px; 
+      font-weight: 900; 
+      line-height: 1;
+    }
+
+    /* SP推しスキルボタン */
+    .sp-btn { 
+      background: rgba(236, 72, 153, 0.9); 
+      font-size: 7.5px; 
+      padding: 3px 1px; 
+      width: 100%; 
+      border: none; 
+      border-radius: 3px; 
+      color: white; 
+      font-weight: 900; 
+      line-height: 1.1; 
+      cursor: pointer; 
+      margin: auto 0;
+    }
+    .sp-btn.used { background: rgba(71, 85, 105, 0.85); color: #94a3b8; text-decoration: line-through; }
+
+    /* ダイスコントロール */
+    .dice-control-group { display: flex; align-items: center; gap: 3px; }
+    .dice-count-selector { display: flex; gap: 1px; }
+    .count-btn { 
+      background: rgba(51, 65, 85, 0.85); 
+      color: #cbd5e1; 
+      border: none; 
+      padding: 2px 4px; 
+      font-size: 8px; 
+      font-weight: 900; 
+      border-radius: 2px; 
+      cursor: pointer; 
+    }
+    .count-btn.active { background: #10b981; color: white; }
+
+    .roll-btn { 
+      background: rgba(16, 185, 129, 0.9); 
+      font-size: 9px; 
+      padding: 3px 6px; 
+      border-radius: 3px; 
+      border: none; 
+      color: white; 
+      font-weight: 900; 
+      cursor: pointer; 
+    }
+
+    .last-dice-result {
+      font-size: 9px;
+      font-weight: 900;
+      color: #38bdf8;
+      background: rgba(15, 23, 42, 0.8);
+      padding: 2px 5px;
+      border-radius: 3px;
+      border: 1px solid rgba(56, 189, 248, 0.5);
+    }
+
+    /* モーダル＆オーバーレイ */
+    #flow-modal {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(4px);
+      z-index: 500;
+      display: none;
+      justify-content: center;
+      align-items: center;
+    }
+    #flow-modal.active { display: flex; }
+    
+    .flow-modal-content {
+      display: flex; flex-direction: column; gap: 12px; width: 90%; max-width: 320px; align-items: center;
+    }
+    .flow-card {
+      background: #1e293b; border: 1px solid #38bdf8; border-radius: 8px; width: 100%; padding: 8px 10px; text-align: left;
+    }
+    .flow-title {
+      font-size: 10px; font-weight: bold; color: #38bdf8; margin-bottom: 4px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 2px;
+    }
+    .flow-list { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+    .flow-step { font-size: 8px; line-height: 1.2; background: rgba(255,255,255,0.03); padding: 3px; border-radius: 3px; }
+    .flow-step span { color: #fde047; font-weight: bold; display: block; }
+    .flow-close-btn { width: 100%; background: #3b82f6; color: white; border: none; padding: 6px; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; }
+
+    #global-overlay {
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(5px); z-index: 999; display: flex; flex-direction: column; justify-content: center; align-items: center; opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+    }
+    #global-overlay.active { opacity: 1; pointer-events: auto; }
+    .fullscreen-stage { position: absolute; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; pointer-events: none; }
+
+    /* 3Dダイス */
+    .fs-dice-wrapper { position: absolute; width: 46px; height: 46px; transition: all 2s cubic-bezier(0.25, 1, 0.5, 1); }
+    .fs-dice { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform 2.2s cubic-bezier(0.1, 0.9, 0.2, 1); }
+    .fs-dice-face { position: absolute; width: 46px; height: 46px; background: #fff; border: 2px solid #cbd5e1; border-radius: 8px; display: grid; padding: 4px; box-sizing: border-box; }
+    .fs-dice-face .dot { width: 7px; height: 7px; background-color: #1e293b; border-radius: 50%; justify-self: center; align-self: center; }
+    .fs-dice-face .dot.red { background-color: #ef4444; width: 11px; height: 11px; }
+    .fs-dice-face.f1 { transform: rotateY(0deg) translateZ(23px); display: flex; justify-content: center; align-items: center; }
+    .fs-dice-face.f2 { transform: rotateY(90deg) translateZ(23px); display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+    .fs-dice-face.f2 .dot:nth-child(1) { grid-column: 1; grid-row: 1; } .fs-dice-face.f2 .dot:nth-child(2) { grid-column: 2; grid-row: 2; }
+    .fs-dice-face.f3 { transform: rotateY(180deg) translateZ(23px); display: grid; grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr 1fr; }
+    .fs-dice-face.f3 .dot:nth-child(1) { grid-column: 1; grid-row: 1; } .fs-dice-face.f3 .dot:nth-child(2) { grid-column: 2; grid-row: 2; } .fs-dice-face.f3 .dot:nth-child(3) { grid-column: 3; grid-row: 3; }
+    .fs-dice-face.f4 { transform: rotateY(-90deg) translateZ(23px); display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 2px; }
+    .fs-dice-face.f5 { transform: rotateX(90deg) translateZ(23px); display: grid; grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr 1fr; }
+    .fs-dice-face.f5 .dot:nth-child(1) { grid-column: 1; grid-row: 1; } .fs-dice-face.f5 .dot:nth-child(2) { grid-column: 3; grid-row: 1; } .fs-dice-face.f5 .dot:nth-child(3) { grid-column: 2; grid-row: 2; } .fs-dice-face.f5 .dot:nth-child(4) { grid-column: 1; grid-row: 3; } .fs-dice-face.f5 .dot:nth-child(5) { grid-column: 3; grid-row: 3; }
+    .fs-dice-face.f6 { transform: rotateX(-90deg) translateZ(23px); display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr 1fr; gap: 2px; }
+
+    /* カットイン */
+    .sp-cutin-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; justify-content: center; align-items: center; width: 100%; z-index: 1000; }
+    .sp-text-single { font-size: 26px; font-weight: 900; color: #f472b6; text-shadow: 0 0 10px #ec4899; opacity: 0; transform: scale(0.3); transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); white-space: nowrap; }
+    .sp-text-single.opponent-side { transform: rotate(180deg) scale(0.3); }
+    .sp-cutin-container.show .sp-text-single { opacity: 1; transform: scale(1); }
+    .sp-cutin-container.show .sp-text-single.opponent-side { opacity: 1; transform: rotate(180deg) scale(1); }
+
+    .dice-result-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: space-between; align-items: center; padding: 15vh 0; pointer-events: none; z-index: 1000; }
+    .dice-overlay-text { font-size: 20px; font-weight: 900; color: #fff; opacity: 0; transition: all 0.5s; text-shadow: 0 0 8px rgba(0,0,0,0.8), 0 0 12px rgba(56, 189, 248, 0.8); }
+    .dice-overlay-text.p2 { transform: rotate(180deg) scale(0.3); }
+    .dice-overlay-text.p1 { transform: scale(0.3); }
+    .dice-result-container.show .dice-overlay-text.p2 { opacity: 1; transform: rotate(180deg) scale(1); }
+    .dice-result-container.show .dice-overlay-text.p1 { opacity: 1; transform: scale(1); }
+  </style>
+</head>
+<body>
+
+  <!-- 【上半分】 相手側エリア（180度回転） -->
+  <div class="player-board opponent-side">
+    <div class="playmat-grid">
+      <!-- 左側：9.ライフ / 8.エールデッキ -->
+      <div class="side-col">
+        <div class="zone" style="height: 52%;">
+          <div class="zone-title" style="color:#f43f5e;">9. ライフ</div>
+          <div class="count-val life-val" id="res-p2-life">6</div>
+          <div class="mini-btn-group">
+            <button class="mini-btn" onclick="addRes('p2', 'life', 1)">▲</button>
+            <button class="mini-btn" onclick="addRes('p2', 'life', -1)">▼</button>
+          </div>
+        </div>
+        <div class="zone" style="height: 46%;">
+          <div class="zone-title">8. エール</div>
+          <div class="count-val" id="res-p2-yell">20</div>
+          <div class="mini-btn-group">
+            <button class="mini-btn" onclick="addRes('p2', 'yell', 1)">▲</button>
+            <button class="mini-btn" onclick="addRes('p2', 'yell', -1)">▼</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 中央：3.コラボ / 2.メイン / 1.推しホロメン & 4.バック -->
+      <div class="stage-col">
+        <div class="stage-top">
+          <!-- 3: コラボ -->
+          <div class="zone empty" id="card-p2-collab">
+            <div class="zone-title">3. コラボ</div>
+            <div class="count-val dmg" id="dmgmain-p2-collab">―</div>
+            <div class="dice-btn-group">
+              <button class="tri-btn b100" onclick="add('p2', 'collab', 100)">+100</button>
+              <button class="tri-btn b50" onclick="add('p2', 'collab', 50)">+50</button>
+              <button class="tri-btn b10" onclick="add('p2', 'collab', 10)">+10</button>
+            </div>
+            <div class="action-row">
+              <button class="action-btn sub" onclick="add('p2', 'collab', -10)">-10</button>
+              <button class="action-btn empty-btn" onclick="setEmpty('p2', 'collab')">不在</button>
+            </div>
+            <button class="move-btn" onclick="selectMove('p2', 'collab')">交替</button>
+          </div>
+
+          <!-- 2: メイン（センター） -->
+          <div class="zone" id="card-p2-center">
+            <div class="zone-title">2. メイン</div>
+            <div class="count-val dmg" id="dmgmain-p2-center">0</div>
+            <div class="dice-btn-group">
+              <button class="tri-btn b100" onclick="add('p2', 'center', 100)">+100</button>
+              <button class="tri-btn b50" onclick="add('p2', 'center', 50)">+50</button>
+              <button class="tri-btn b10" onclick="add('p2', 'center', 10)">+10</button>
+            </div>
+            <div class="action-row">
+              <button class="action-btn sub" onclick="add('p2', 'center', -10)">-10</button>
+              <button class="action-btn clear" onclick="reset('p2', 'center')">C</button>
+            </div>
+            <button class="move-btn" onclick="selectMove('p2', 'center')">交替</button>
+          </div>
+
+          <!-- 1: 推しホロメン -->
+          <div class="zone" style="border-color: rgba(236, 72, 153, 0.6);">
+            <div class="zone-title" style="color: #f472b6;">1. 推し</div>
+            <button id="sp-btn-p2" class="sp-btn" onclick="toggleSP('p2')">SP推し<br>【未使用】</button>
+          </div>
+        </div>
+
+        <!-- 4: バックホロメン（5枠） -->
+        <div class="stage-bottom">
+          <script>
+            for(let i=1; i<=5; i++){
+              document.write(`
+                <div class="zone empty" id="card-p2-b${i}">
+                  <div class="zone-title">4. バック${i}</div>
+                  <div class="count-val dmg" id="dmgmain-p2-b${i}">―</div>
+                  <div class="dice-btn-group">
+                    <button class="tri-btn b50" onclick="add('p2', 'b${i}', 50)">+50</button>
+                    <button class="tri-btn b10" onclick="add('p2', 'b${i}', 10)">+10</button>
+                  </div>
+                  <div class="action-row">
+                    <button class="action-btn sub" onclick="add('p2', 'b${i}', -10)">-10</button>
+                    <button class="action-btn empty-btn" onclick="setEmpty('p2', 'b${i}')">不在</button>
+                  </div>
+                  <button class="move-btn" onclick="selectMove('p2', 'b${i}')">交替</button>
+                </div>
+              `);
+            }
+          </script>
+        </div>
+      </div>
+
+      <!-- 右側：7.ホロパワー / 5.デッキ / 6.アーカイブ -->
+      <div class="side-col">
+        <div class="zone" style="height: 32%;">
+          <div class="zone-title">7. ホロパワー</div>
+          <div class="count-val" id="res-p2-power">0</div>
+          <div class="mini-btn-group">
+            <button class="mini-btn" onclick="addRes('p2', 'power', 1)">▲</button>
+            <button class="mini-btn" onclick="addRes('p2', 'power', -1)">▼</button>
+          </div>
+        </div>
+        <div class="zone" style="height: 34%;">
+          <div class="zone-title">5. デッキ</div>
+          <div class="count-val" id="res-p2-deck">50</div>
+          <div class="mini-btn-group">
+            <button class="mini-btn" onclick="addRes('p2', 'deck', 1)">▲</button>
+            <button class="mini-btn" onclick="addRes('p2', 'deck', -1)">▼</button>
+          </div>
+        </div>
+        <div class="zone" style="height: 32%;">
+          <div class="zone-title">6. アーカイブ</div>
+          <div class="count-val" id="res-p2-archive">0</div>
+          <div class="mini-btn-group">
+            <button class="mini-btn" onclick="addRes('p2', 'archive', 1)">▲</button>
+            <button class="mini-btn" onclick="addRes('p2', 'archive', -1)">▼</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 【中央】 共有機能バー -->
+  <div class="center-bar">
+    <div style="display: flex; gap: 3px; align-items: center;">
+      <label class="bg-input-label">
+        🖼
+        <input type="file" id="bg-file" accept="image/*" onchange="changeBackground(event)">
+      </label>
+      <button class="header-btn" id="fs-btn" onclick="toggleFullscreen()">⛶ 全画面</button>
+      <button class="header-btn" style="background: rgba(14, 165, 233, 0.8);" onclick="toggleFlowModal(true)">📜 ターン</button>
+    </div>
+
+    <div class="dice-control-group">
+      <div id="last-dice-display" class="last-dice-result" style="display: none;">🎲 -</div>
+      <div class="dice-count-selector">
+        <button class="count-btn active" id="cnt-1" onclick="setDiceCount(1)">1</button>
+        <button class="count-btn" id="cnt-2" onclick="setDiceCount(2)">2</button>
+        <button class="count-btn" id="cnt-3" onclick="setDiceCount(3)">3</button>
+      </div>
+      <button class="roll-btn" id="dice-btn" onclick="rollDice()">🎲 振る</button>
+    </div>
+  </div>
+
+  <!-- 【下半分】 自分側エリア（正位置） -->
+  <div class="player-board">
+    <div class="playmat-grid">
+      <!-- 左側：9.ライフ / 8.エールデッキ -->
+      <div class="side-col">
+        <div class="zone" style="height: 52%;">
+          <div class="zone-title" style="color:#f43f5e;">9. ライフ</div>
+          <div class="count-val life-val" id="res-p1-life">6</div>
+          <div class="mini-btn-group">
+            <button class="mini-btn" onclick="addRes('p1', 'life', 1)">▲</button>
+            <button class="mini-btn" onclick="addRes('p1', 'life', -1)">▼</button>
+          </div>
+        </div>
+        <div class="zone" style="height: 46%;">
+          <div class="zone-title">8. エール</div>
+          <div class="count-val" id="res-p1-yell">20</div>
+          <div class="mini-btn-group">
+            <button class="mini-btn" onclick="addRes('p1', 'yell', 1)">▲</button>
+            <button class="mini-btn" onclick="addRes('p1', 'yell', -1)">▼</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 中央：3.コラボ / 2.メイン / 1.推しホロメン & 4.バック -->
+      <div class="stage-col">
+        <div class="stage-top">
+          <!-- 3: コラボ -->
+          <div class="zone empty" id="card-p1-collab">
+            <div class="zone-title">3. コラボ</div>
+            <div class="count-val dmg" id="dmgmain-p1-collab">―</div>
+            <div class="dice-btn-group">
+              <button class="tri-btn b100" onclick="add('p1', 'collab', 100)">+100</button>
+              <button class="tri-btn b50" onclick="add('p1', 'collab', 50)">+50</button>
+              <button class="tri-btn b10" onclick="add('p1', 'collab', 10)">+10</button>
+            </div>
+            <div class="action-row">
+              <button class="action-btn sub" onclick="add('p1', 'collab', -10)">-10</button>
+              <button class="action-btn empty-btn" onclick="setEmpty('p1', 'collab')">不在</button>
+            </div>
+            <button class="move-btn" onclick="selectMove('p1', 'collab')">交替</button>
+          </div>
+
+          <!-- 2: メイン（センター） -->
+          <div class="zone" id="card-p1-center">
+            <div class="zone-title">2. メイン</div>
+            <div class="count-val dmg" id="dmgmain-p1-center">0</div>
+            <div class="dice-btn-group">
+              <button class="tri-btn b100" onclick="add('p1', 'center', 100)">+100</button>
+              <button class="tri-btn b50" onclick="add('p1', 'center', 50)">+50</button>
+              <button class="tri-btn b10" onclick="add('p1', 'center', 10)">+10</button>
+            </div>
+            <div class="action-row">
+              <button class="action-btn sub" onclick="add('p1', 'center', -10)">-10</button>
+              <button class="action-btn clear" onclick="reset('p1', 'center')">C</button>
+            </div>
+            <button class="move-btn" onclick="selectMove('p1', 'center')">交替</button>
+          </div>
+
+          <!-- 1: 推しホロメン -->
+          <div class="zone" style="border-color: rgba(236, 72, 153, 0.6);">
+            <div class="zone-title" style="color: #f472b6;">1. 推し</div>
+            <button id="sp-btn-p1" class="sp-btn" onclick="toggleSP('p1')">SP推し<br>【未使用】</button>
+          </div>
+        </div>
+
+        <!-- 4: バックホロメン（5枠） -->
+        <div class="stage-bottom">
+          <script>
+            for(let i=1; i<=5; i++){
+              document.write(`
+                <div class="zone empty" id="card-p1-b${i}">
+                  <div class="zone-title">4. バック${i}</div>
+                  <div class="count-val dmg" id="dmgmain-p1-b${i}">―</div>
+                  <div class="dice-btn-group">
+                    <button class="tri-btn b50" onclick="add('p1', 'b${i}', 50)">+50</button>
+                    <button class="tri-btn b10" onclick="add('p1', 'b${i}', 10)">+10</button>
+                  </div>
+                  <div class="action-row">
+                    <button class="action-btn sub" onclick="add('p1', 'b${i}', -10)">-10</button>
+                    <button class="action-btn empty-btn" onclick="setEmpty('p1', 'b${i}')">不在</button>
+                  </div>
+                  <button class="move-btn" onclick="selectMove('p1', 'b${i}')">交替</button>
+                </div>
+              `);
+            }
+          </script>
+        </div>
+      </div>
+
+      <!-- 右側：7.ホロパワー / 5.デッキ / 6.アーカイブ -->
+      <div class="side-col">
+        <div class="zone" style="height: 32%;">
+          <div class="zone-title">7. ホロパワー</div>
+          <div class="count-val" id="res-p1-power">0</div>
+          <div class="mini-btn-group">
+            <button class="mini-btn" onclick="addRes('p1', 'power', 1)">▲</button>
+            <button class="mini-btn" onclick="addRes('p1', 'power', -1)">▼</button>
+          </div>
+        </div>
+        <div class="zone" style="height: 34%;">
+          <div class="zone-title">5. デッキ</div>
+          <div class="count-val" id="res-p1-deck">50</div>
+          <div class="mini-btn-group">
+            <button class="mini-btn" onclick="addRes('p1', 'deck', 1)">▲</button>
+            <button class="mini-btn" onclick="addRes('p1', 'deck', -1)">▼</button>
+          </div>
+        </div>
+        <div class="zone" style="height: 32%;">
+          <div class="zone-title">6. アーカイブ</div>
+          <div class="count-val" id="res-p1-archive">0</div>
+          <div class="mini-btn-group">
+            <button class="mini-btn" onclick="addRes('p1', 'archive', 1)">▲</button>
+            <button class="mini-btn" onclick="addRes('p1', 'archive', -1)">▼</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ターンフロー モーダル -->
+  <div id="flow-modal">
+    <div class="flow-modal-content">
+      <div class="flow-card opponent-side">
+        <div class="flow-title">ターン進行ガイド</div>
+        <div class="flow-list">
+          <div class="flow-step"><span>1. リセット</span>起こす / コラボ休み</div>
+          <div class="flow-step"><span>2. 手札</span>1枚引く</div>
+          <div class="flow-step"><span>3. エール</span>エール1枚送る</div>
+          <div class="flow-step"><span>4. メイン</span>カードプレイ/コラボ</div>
+          <div class="flow-step"><span>5. パフォーマンス</span>アーツ（攻撃）使用</div>
+          <div class="flow-step"><span>6. エンド</span>ターン交代</div>
+        </div>
+      </div>
+      <div class="flow-card">
+        <div class="flow-title">ターン進行ガイド</div>
+        <div class="flow-list">
+          <div class="flow-step"><span>1. リセット</span>起こす / コラボ休み</div>
+          <div class="flow-step"><span>2. 手札</span>1枚引く</div>
+          <div class="flow-step"><span>3. エール</span>エール1枚送る</div>
+          <div class="flow-step"><span>4. メイン</span>カードプレイ/コラボ</div>
+          <div class="flow-step"><span>5. パフォーマンス</span>アーツ（攻撃）使用</div>
+          <div class="flow-step"><span>6. エンド</span>ターン交代</div>
+        </div>
+        <button class="flow-close-btn" onclick="toggleFlowModal(false)">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 全画面演出レイヤー -->
+  <div id="global-overlay">
+    <div class="fullscreen-stage" id="stage-area"></div>
+    <div id="sp-cutin-box" class="sp-cutin-container" style="display: none;">
+      <div id="sp-cutin-text" class="sp-text-single">✨ SP推しスキル発動！ ✨</div>
+    </div>
+    
+    <div id="dice-result-box" class="dice-result-container" style="display: none;">
+      <div id="dice-text-p2" class="dice-overlay-text p2"></div>
+      <div id="dice-text-p1" class="dice-overlay-text p1"></div>
+    </div>
+  </div>
+
+  <!-- ダイステンプレート -->
+  <template id="fs-dice-template">
+    <div class="fs-dice-wrapper">
+      <div class="fs-dice">
+        <div class="fs-dice-face f1"><span class="dot red"></span></div>
+        <div class="fs-dice-face f2"><span class="dot"></span><span class="dot"></span></div>
+        <div class="fs-dice-face f3"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+        <div class="fs-dice-face f4"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+        <div class="fs-dice-face f5"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+        <div class="fs-dice-face f6"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+      </div>
+    </div>
+  </template>
+
+  <script>
+    const state = {
+      p1: { center: 0, collab: null, b1: null, b2: null, b3: null, b4: null, b5: null, spUsed: false, deck: 50, archive: 0, life: 6, power: 0, yell: 20 },
+      p2: { center: 0, collab: null, b1: null, b2: null, b3: null, b4: null, b5: null, spUsed: false, deck: 50, archive: 0, life: 6, power: 0, yell: 20 }
+    };
+
+    let selectedMove = null;
+    let currentDiceCount = 1;
+    let rollCount = 0;
+
+    function addRes(player, type, val) {
+      state[player][type] = Math.max(0, state[player][type] + val);
+      document.getElementById(`res-${player}-${type}`).innerText = state[player][type];
+    }
+
+    function toggleFlowModal(show) {
+      const modal = document.getElementById('flow-modal');
+      if (show) modal.classList.add('active');
+      else modal.classList.remove('active');
+    }
+
+    function toggleFullscreen() {
+      const fsBtn = document.getElementById('fs-btn');
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().then(() => {
+          fsBtn.innerText = '✕ 解除';
+        }).catch(err => console.log(err));
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen().then(() => {
+            fsBtn.innerText = '⛶ 全画面';
+          });
+        }
+      }
+    }
+
+    function changeBackground(e) {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          document.body.style.backgroundImage = `url('${evt.target.result}')`;
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    function add(player, slot, val) {
+      if (state[player][slot] === null) state[player][slot] = 0;
+      state[player][slot] = Math.max(0, state[player][slot] + val);
+      updateUI(player, slot);
+    }
+
+    function reset(player, slot) { state[player][slot] = 0; updateUI(player, slot); }
+    function setEmpty(player, slot) { state[player][slot] = null; updateUI(player, slot); }
+
+    function updateUI(player, slot) {
+      const cardEl = document.getElementById(`card-${player}-${slot}`);
+      const mainEl = document.getElementById(`dmgmain-${player}-${slot}`);
+
+      if (state[player][slot] === null) {
+        mainEl.innerText = '―';
+        if (cardEl) cardEl.classList.add('empty');
+      } else {
+        mainEl.innerText = state[player][slot];
+        if (cardEl) cardEl.classList.remove('empty');
+      }
+    }
+
+    function selectMove(player, slot) {
+      if (!selectedMove) {
+        selectedMove = { player, slot };
+        document.getElementById(`card-${player}-${slot}`).classList.add('selected');
+      } else if (selectedMove.player === player && selectedMove.slot === slot) {
+        document.getElementById(`card-${player}-${slot}`).classList.remove('selected');
+        selectedMove = null;
+      } else if (selectedMove.player === player) {
+        const p = player;
+        const s1 = selectedMove.slot;
+        const s2 = slot;
+
+        const temp = state[p][s1];
+        state[p][s1] = state[p][s2];
+        state[p][s2] = temp;
+
+        updateUI(p, s1);
+        updateUI(p, s2);
+
+        document.getElementById(`card-${p}-${s1}`).classList.remove('selected');
+        selectedMove = null;
+      }
+    }
+
+    function toggleSP(player) {
+      const btn = document.getElementById(`sp-btn-${player}`);
+      state[player].spUsed = !state[player].spUsed;
+
+      if (state[player].spUsed) {
+        btn.classList.add('used');
+        btn.innerHTML = 'SP推し<br>【使用済】';
+        triggerSPCutin(player);
+      } else {
+        btn.classList.remove('used');
+        btn.innerHTML = 'SP推し<br>【未使用】';
+      }
+    }
+
+    function triggerSPCutin(player) {
+      const overlay = document.getElementById('global-overlay');
+      const stage = document.getElementById('stage-area');
+      const spBox = document.getElementById('sp-cutin-box');
+      const spText = document.getElementById('sp-cutin-text');
+      const diceResultBox = document.getElementById('dice-result-box');
+
+      stage.innerHTML = '';
+      diceResultBox.style.display = 'none';
+
+      if (player === 'p2') {
+        spText.classList.add('opponent-side');
+      } else {
+        spText.classList.remove('opponent-side');
+      }
+
+      spBox.style.display = 'flex';
+      overlay.classList.add('active');
+
+      setTimeout(() => { spBox.classList.add('show'); }, 50);
+
+      setTimeout(() => {
+        spBox.classList.remove('show');
+        overlay.classList.remove('active');
+        setTimeout(() => { spBox.style.display = 'none'; }, 300);
+      }, 1800);
+    }
+
+    function setDiceCount(num) {
+      currentDiceCount = num;
+      document.querySelectorAll('.count-btn').forEach(btn => btn.classList.remove('active'));
+      document.getElementById(`cnt-${num}`).classList.add('active');
+    }
+
+    function rollDice() {
+      const overlay = document.getElementById('global-overlay');
+      const stage = document.getElementById('stage-area');
+      const diceResultBox = document.getElementById('dice-result-box');
+      const textP1 = document.getElementById('dice-text-p1');
+      const textP2 = document.getElementById('dice-text-p2');
+      const btn = document.getElementById('dice-btn');
+      const lastDisplay = document.getElementById('last-dice-display');
+
+      btn.disabled = true;
+      stage.innerHTML = '';
+      
+      diceResultBox.classList.remove('show');
+      diceResultBox.style.display = 'flex';
+      overlay.classList.add('active');
+
+      rollCount++;
+      const extraSpin = rollCount * 1440;
+
+      const rotations = {
+        1: { x: 0, y: 0 }, 2: { x: 0, y: -90 }, 3: { x: 0, y: -180 },
+        4: { x: 0, y: 90 }, 5: { x: -90, y: 0 }, 6: { x: 90, y: 0 }
+      };
+
+      const template = document.getElementById('fs-dice-template');
+      let sum = 0;
+      let results = [];
+
+      for (let i = 0; i < currentDiceCount; i++) {
+        const res = Math.floor(Math.random() * 6) + 1;
+        sum += res;
+        results.push(res);
+
+        const clone = template.content.cloneNode(true);
+        const wrapper = clone.querySelector('.fs-dice-wrapper');
+        const dice = clone.querySelector('.fs-dice');
+
+        const startX = (Math.random() - 0.5) * 40;
+        const startY = -100;
+        wrapper.style.left = `calc(50% + ${startX}px - 23px)`;
+        wrapper.style.top = `calc(50% + ${startY}px - 23px)`;
+
+        stage.appendChild(clone);
+
+        setTimeout(() => {
+          const totalWidth = currentDiceCount * 54;
+          const targetX = (i * 54) - (totalWidth / 2) + 27;
+          wrapper.style.left = `calc(50% + ${targetX}px - 23px)`;
+          wrapper.style.top = `calc(50% - 23px)`;
+
+          const target = rotations[res];
+          const finalX = target.x + extraSpin;
+          const finalY = target.y + extraSpin;
+
+          dice.style.transform = `rotateX(${finalX}deg) rotateY(${finalY}deg)`;
+        }, 50 + i * 80);
+      }
+
+      setTimeout(() => {
+        const resultTextOverlay = currentDiceCount > 1 ? `合計: ${sum}\n(${results.join('+')})` : `出目: ${sum}`;
+        
+        textP1.innerText = resultTextOverlay;
+        textP2.innerText = resultTextOverlay;
+        diceResultBox.classList.add('show');
+
+        lastDisplay.innerText = currentDiceCount > 1 ? `🎲 ${sum} (${results.join('+')})` : `🎲 ${sum}`;
+        lastDisplay.style.display = 'inline-block';
+      }, 2100);
+
+      setTimeout(() => {
+        diceResultBox.classList.remove('show');
+        overlay.classList.remove('active');
+        btn.disabled = false;
+        setTimeout(() => { diceResultBox.style.display = 'none'; }, 300);
+      }, 3400);
+    }
+  </script>
+</body>
+</html>
